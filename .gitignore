@@ -1,0 +1,7 @@
+*.hi
+*.o
+*.gz
+*.info
+Lexer.hs
+Parser.hs
+Main

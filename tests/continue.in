@@ -1,0 +1,6 @@
+a   =   0
+while a < 10:
+  a = a+1
+  if 2 < a and a < 7:
+    continue
+  print a
