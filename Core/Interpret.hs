@@ -6,6 +6,7 @@ module Hython.Core.Interpret (
 import qualified Data.Map as M
 import Control.Monad.Cont
 import Control.Monad.State.Strict
+import Data.IORef
 import Data.Lens.Strict
 import Hython.Core.Prim
 import qualified Hython.Parser.ADT as ADT
@@ -15,6 +16,9 @@ class Interpretable t where
 
 instance Interpretable a => Interpretable [a] where
   interpret xs = mapM_ interpret xs >> pass
+
+isProcedureCall ProcedureCall{} = True
+isProcedureCall _ = False
 
 instance Interpretable ADT.StatementS where
   interpret (ADT.Assign _ to e) = do
@@ -38,8 +42,9 @@ instance Interpretable ADT.StatementS where
              else unwindPastWhile >> interpret els >> end
     push $ WhileLoop go end
     go
-  interpret (ADT.StmtExpr _ e) = interpret e
+  interpret (ADT.StmtExpr _ e) = interpret e >> pass
   interpret (ADT.Continue _) = unwindUptoWhile >>= loop_start
+  interpret (ADT.Pass _) = pass
   interpret (ADT.Break _) = unwindPastWhile >>= loop_end
   interpret (ADT.Print _ e c) = go e >> pass
     where
@@ -47,17 +52,34 @@ instance Interpretable ADT.StatementS where
         v <- interpret e
         printObject v
         liftIO . putChar $ if c then ' ' else '\n'
+  interpret (ADT.Return _ expr) = do
+    e <- interpret expr
+    s <- unwind isProcedureCall
+    procedure_return s e
+  interpret (ADT.Fun _ name params body) = do
+    ref <- liftIO . newIORef $ Function{ object_arity = length params, object_proc = proc }
+    local_vars %= M.insert name ref
+    flag <- isTopLevel
+    when flag $ access local_vars >>= (global_vars ~=) >> return ()
+    pass
+    where
+      proc :: [Object] -> Eval Object
+      proc args = do
+        when (length args /= length params) $
+          error "arity mismatch"
+        a <- liftIO $ mapM newIORef args
+        withStateT (local_vars ^= M.fromList (zip params a)) $ do
+          g <- access global_vars
+          interpret body
+        s <- unwind isProcedureCall
+        procedure_return s None
 
 printObject (Integer i) = liftIO . putStr $ show i
 printObject (Bool b) = liftIO . putStr $ show b
 printObject None = return ()
 
 instance Interpretable ADT.ExprS where
-  interpret (ADT.Var _ i) = do
-    vs <- access vars
-    case M.lookup i vs of
-      Nothing -> error "no var"
-      Just v -> return v
+  interpret (ADT.Var s i) = ident2ref i >>= liftIO . readIORef
   interpret (ADT.Int _ i) = return $ Integer i
   interpret (ADT.Bool _ b) = return $ Bool b
   interpret (ADT.None _) = pass
@@ -66,8 +88,31 @@ instance Interpretable ADT.ExprS where
     x' <- interpret x
     y' <- interpret y
     return $ binaryOp op x' y'
+  interpret (ADT.Call s fun args) = do
+    f <- interpret fun
+    a <- mapM interpret args
+    case f of
+      f@Function{} -> do
+        s <- get
+        r <- withStateT (nesting_lv ^%= succ) . callCC $ \ret -> do
+          push (ProcedureCall ret)
+          object_proc f a
+        put s
+        return r
+      _ -> error $ show s ++ " not callable"
 
-ADT.Var _ i =: x = vars %= M.insert i x
+ident2ref i = do
+  local <- access local_vars
+  global <- access global_vars
+  case M.lookup i local of
+    Just ref -> return ref
+    Nothing -> case M.lookup i global of
+      Just ref -> return ref
+      Nothing -> error $ "not found in scope"
+
+ADT.Var _ i =: x = do
+  ref <- ident2ref i
+  liftIO $ writeIORef ref x
 _ =: _ = error "lvalue"
 
 unaryOp ADT.Plus{} (Integer x) = Integer x

@@ -44,8 +44,11 @@ data Token =
   | BreakToken { token_span :: !Span }
   | ContinueToken { token_span :: !Span }
   | AssignToken { token_span :: !Span }
+  | ReturnToken { token_span :: !Span }
+  | PassToken { token_span :: !Span }
 
   -- Delimiters
+  | DefToken { token_span :: !Span }
   | LeftParenToken { token_span :: !Span }
   | RightParenToken { token_span :: !Span }
   | LeftBracketToken { token_span :: !Span }
