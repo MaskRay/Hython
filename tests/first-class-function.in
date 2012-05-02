@@ -1,0 +1,7 @@
+def f(g, n):
+    return g(g(n))
+
+def g(a):
+    return a * 3 + 2
+
+print f(g, 4)

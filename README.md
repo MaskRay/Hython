@@ -12,7 +12,19 @@ ghc, alex, happy, cmdargs, data-lens, data-lens-template
 
 ## Supporting Features
 
-So far, only three types are supported: None, Integer and Bool.
-Only one kind of assignment (plain) is implemented.
+### Data types
+
+These are a list of available data types:
+
+1. None
+2. Integer
+3. Bool
+4. Function
+
+### Flow control statements
+
+1. if .. elif .. else
+2. while .. else
+3. break continue
 
 Check out `tests/` to find out all features.

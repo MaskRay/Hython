@@ -60,6 +60,7 @@ $non_eol = ~ [\n \r]
   "/" { symbol DivToken }
   "=" { symbol AssignToken }
   ":" { symbol ColonToken }
+  "," { symbol CommaToken }
   "==" { symbol EqToken }
   "!=" { symbol NotEqToken }
   "<" { symbol LessToken }
