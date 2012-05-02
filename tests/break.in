@@ -1,5 +1,5 @@
 i = 0
-while i < 10:
+while i < 22: # my no. when i was at junior school
   i = i+3
   if i > 8: break
 print i

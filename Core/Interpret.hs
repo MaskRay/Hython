@@ -46,38 +46,37 @@ instance Interpretable ADT.StatementS where
   interpret (ADT.Continue _) = unwindUptoWhile >>= loop_start
   interpret (ADT.Pass _) = pass
   interpret (ADT.Break _) = unwindPastWhile >>= loop_end
-  interpret (ADT.Print _ e c) = go e >> pass
-    where
-      go e = do
-        v <- interpret e
-        printObject v
-        liftIO . putChar $ if c then ' ' else '\n'
+  interpret (ADT.Print _ e c) = do
+    v <- interpret e
+    printObject v
+    liftIO . putChar $ if c then ' ' else '\n'
+    pass
   interpret (ADT.Return _ expr) = do
     e <- interpret expr
     s <- unwind isProcedureCall
     procedure_return s e
   interpret (ADT.Fun _ name params body) = do
-    ref <- liftIO . newIORef $ Function{ object_arity = length params, object_proc = proc }
+    ref <- liftIO . newIORef $ Function{ object_arity = length params
+                                      , object_proc = funOrLambdaProc params body (\_ -> unwind isProcedureCall >>= flip procedure_return None) }
     local_vars %= M.insert name ref
     flag <- isTopLevel
     when flag $ access local_vars >>= (global_vars ~=) >> return ()
     pass
-    where
-      proc :: [Object] -> Eval Object
-      proc args = do
-        when (length args /= length params) $
-          error "arity mismatch"
-        a <- liftIO $ mapM newIORef args
-        locals <- access local_vars
-        withStateT ((enclosing_vars^=locals).(local_vars^=M.fromList (zip params a))) $ do
-          g <- access global_vars
-          interpret body
-        s <- unwind isProcedureCall
-        procedure_return s None
 
 printObject (Integer i) = liftIO . putStr $ show i
 printObject (Bool b) = liftIO . putStr $ show b
-printObject None = return ()
+printObject None = liftIO . putStr $ "None"
+printObject Function{} = liftIO . putStr $ "#<function>"
+
+funOrLambdaProc :: (Interpretable a) => [ADT.IdentS] -> a -> (Object -> Eval Object) -> [Object] -> Eval Object
+funOrLambdaProc params body ret args = do
+  when (length args /= length params) $
+    error "arity mismatch"
+  a <- liftIO $ mapM newIORef args
+  locals <- access local_vars
+  r <- withStateT ((enclosing_vars^=locals).(local_vars^=M.fromList (zip params a))) $
+    interpret body
+  ret r
 
 instance Interpretable ADT.ExprS where
   interpret (ADT.Var s i) = do
@@ -85,7 +84,7 @@ instance Interpretable ADT.ExprS where
     case ref of
       Nothing -> error $ show s ++ " not in scope"
       Just ref -> liftIO $ readIORef ref
-  interpret (ADT.Int _ i) = return $ Integer i
+  interpret (ADT.Integer _ i) = return $ Integer i
   interpret (ADT.Bool _ b) = return $ Bool b
   interpret (ADT.None _) = pass
   interpret (ADT.UnaryOp _ op x) = interpret x >>= return . unaryOp op
@@ -93,6 +92,8 @@ instance Interpretable ADT.ExprS where
     x' <- interpret x
     y' <- interpret y
     return $ binaryOp op x' y'
+  interpret (ADT.Lambda _ params body) = return Function{ object_arity = length params
+                                                        , object_proc = funOrLambdaProc params body return }
   interpret (ADT.Call s fun args) = do
     f <- interpret fun
     a <- mapM interpret args

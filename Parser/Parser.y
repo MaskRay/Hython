@@ -38,8 +38,12 @@ import Hython.Parser.Utils
    '<='            { LessEqToken {} }
    '>'             { GreaterToken {} }
    '>='            { GreaterEqToken {} }
+   'none'          { NoneToken {} }
+   'true'          { TrueToken {} }
+   'false'         { FalseToken {} }
    'and'           { AndToken {} }
    'def'           { DefToken {} }
+   'lambda'        { LambdaToken {} }
    'return'        { ReturnToken {} }
    'dedent'        { DedentToken {} }
    'elif'          { ElifToken {} }
@@ -97,7 +101,10 @@ identifier :: { IdentS }
 atom :: { ExprS }
 atom
   : identifier { Var (getSpan $1) $1 }
-  | 'integer' { Int (getSpan $1) (token_int $1) }
+  | 'integer' { Integer (getSpan $1) (token_int $1) }
+  | 'none' { None (getSpan $1) }
+  | 'true' { Bool (getSpan $1) True }
+  | 'false' { Bool (getSpan $1) False }
 
 file :: { [StatementS] }
 file
@@ -105,7 +112,9 @@ file
 
 
 test :: { ExprS }
-test : or_test { $1 }
+test
+  : 'lambda' sepBy(',',identifier) ':' test { Lambda (spanning $1 $4) $2 $4 }
+  | or_test                      { $1 }
 
 or_op :: { OpS }
 or_op : 'or' { Or (getSpan $1) }

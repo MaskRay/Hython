@@ -27,4 +27,9 @@ These are a list of available data types:
 2. while .. else
 3. break continue
 
+### Others
+
+1. one-line lambda
+2. def
+
 Check out `tests/` to find out all features.

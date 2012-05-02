@@ -1,12 +1,17 @@
 .PHONY: all clean dist test Main
 
+ifdef OPT
+ALEXFLAGS := -g
+HAPPYFLAGS := -acg
+endif
+
 all: Main
 
 %.hs: %.x
-	alex -g $<
+	alex $(ALEXFLAGS) $<
 
 %.hs: %.y
-	happy -acg $<
+	happy $(HAPPYFLAGS) $<
 
 Main: Parser/Lexer.hs Parser/Parser.hs
 	ghc -i$(dir $(PWD)) -O2 --make $@

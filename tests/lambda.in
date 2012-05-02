@@ -1,0 +1,6 @@
+def factorial(n, s):
+    if n < 2: return s
+    return factorial(n-1, s * n)
+
+l = lambda n: factorial(n, 1)
+print l(36) # my no. when i was at kindergarten

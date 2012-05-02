@@ -49,6 +49,7 @@ data Token =
 
   -- Delimiters
   | DefToken { token_span :: !Span }
+  | LambdaToken { token_span :: !Span }
   | LeftParenToken { token_span :: !Span }
   | RightParenToken { token_span :: !Span }
   | LeftBracketToken { token_span :: !Span }

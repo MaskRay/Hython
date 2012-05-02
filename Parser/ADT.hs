@@ -41,7 +41,7 @@ data Statement a =
   | Return { stmt_annot :: a, return_expr :: Expr a }
   | Fun { stmt_annot :: a
         , fun_name :: Ident a
-        , fun_args :: [Ident a]
+        , fun_params :: [Ident a]
         , fun_body :: Suite a
         }
   | StmtExpr { stmt_annot :: a, stmt_expr :: Expr a  }
@@ -59,12 +59,16 @@ type Suite a = [Statement a]
 
 data Expr a =
   Var { expr_annot :: a, var_ident :: Ident a }
-  | Int { expr_annot :: a, int_value :: Integer }
+  | Integer { expr_annot :: a, integer_value :: Integer }
   | Bool { expr_annot :: a, bool_value :: Bool }
   | None { expr_annot :: a }
   | UnaryOp { expr_annot :: a, op :: Op a, operand :: Expr a }
   | BinaryOp { expr_annot :: a, op :: Op a, op_lhs :: Expr a, op_rhs :: Expr a }
   | Call { expr_annot :: a, call_fun :: Expr a, call_args :: [Expr a] }
+  | Lambda { expr_annot :: a
+           , lambda_params :: [Ident a]
+           , lambda_body :: Expr a
+           }
   deriving (Show)
 
 type ExprS = Expr Span
