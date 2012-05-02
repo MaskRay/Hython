@@ -22,10 +22,12 @@ import Hython.Parser.Error
 $ident_letter = [a-zA-Z_]
 $digit = 0-9
 @eol = \r \n | \r | \n
+$non_eol = ~ [\n \r]
 
 :-
 
 [\ \f\t\v]+ ;
+\# ($non_eol)* ;
 
 <bof> {
   @eol { endOfLine }
@@ -64,7 +66,6 @@ $digit = 0-9
   "<=" { symbol LessEqToken }
   ">" { symbol GreaterToken }
   ">=" { symbol GreaterEqToken }
-  "print" { symbol PrintToken }
 }
 
 {
@@ -119,7 +120,8 @@ keywords = Map.fromList
    , ("elif", ElifToken)
    , ("print", PrintToken)
    , ("while", WhileToken)
-   , ("print", PrintToken)
+   , ("return", ReturnToken)
+   , ("def", DefToken)
    ]
 
 data BO = BOF | BOL
@@ -204,4 +206,5 @@ type T a = P AlexInput a
 parseCode code cont = evalStateT (setInput (alexStartPos,'\n',[],code) >> cont) initState'
 
 initState' = initState bof
- }
+
+}

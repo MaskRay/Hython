@@ -1,0 +1,9 @@
+def factorial(n): # comment test
+    if n < 2:
+        return 1
+    g = n
+    def hello(b):
+        return factorial(b-1) * g
+    return hello(n)
+
+print factorial(4)

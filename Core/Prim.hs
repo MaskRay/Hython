@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns, RecordWildCards #-}
 module Hython.Core.Prim (
   ControlStack(..), Eval, push, pop, initS,
-  Object(..), isTopLevel, local_vars, global_vars, nesting_lv, control, pass,
+  Object(..), isTopLevel, local_vars, enclosing_vars, global_vars, nesting_lv, control, pass,
   isTrue, unwind, unwindPastWhile, unwindUptoWhile, dumpStack
   ) where
 
@@ -29,17 +29,19 @@ data ControlStack =
     , stack_tail :: ControlStack
     }
 
-data S = S { _local_vars :: M.Map (ADT.Ident Span) ObjectRef
-           , _global_vars :: M.Map (ADT.Ident Span) ObjectRef
+data S = S { _local_vars :: M.Map ADT.IdentS ObjectRef
+           , _enclosing_vars :: M.Map ADT.IdentS ObjectRef
+           , _global_vars :: M.Map ADT.IdentS ObjectRef
            , _nesting_lv :: Int
            , _control :: ControlStack }
 
 type Eval a = StateT S (ContT Object IO) a
 
 isTopLevel = liftM (==0) (access nesting_lv) :: Eval Bool
-initS = S M.empty M.empty 0 EmptyStack
+initS = S M.empty M.empty M.empty 0 EmptyStack
 
 local_vars = lens _local_vars $ \v s -> s{ _local_vars = v}
+enclosing_vars = lens _enclosing_vars $ \v s -> s{ _enclosing_vars = v}
 global_vars = lens _global_vars $ \v s -> s{ _global_vars = v}
 control = lens _control $ \c s -> s{ _control = c}
 nesting_lv = lens _nesting_lv $ \l s -> s{ _nesting_lv = l}

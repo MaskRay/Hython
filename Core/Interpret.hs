@@ -68,7 +68,8 @@ instance Interpretable ADT.StatementS where
         when (length args /= length params) $
           error "arity mismatch"
         a <- liftIO $ mapM newIORef args
-        withStateT (local_vars ^= M.fromList (zip params a)) $ do
+        locals <- access local_vars
+        withStateT ((enclosing_vars^=locals).(local_vars^=M.fromList (zip params a))) $ do
           g <- access global_vars
           interpret body
         s <- unwind isProcedureCall
@@ -79,7 +80,11 @@ printObject (Bool b) = liftIO . putStr $ show b
 printObject None = return ()
 
 instance Interpretable ADT.ExprS where
-  interpret (ADT.Var s i) = ident2ref i >>= liftIO . readIORef
+  interpret (ADT.Var s i) = do
+    ref <- ident2ref i
+    case ref of
+      Nothing -> error $ show s ++ " not in scope"
+      Just ref -> liftIO $ readIORef ref
   interpret (ADT.Int _ i) = return $ Integer i
   interpret (ADT.Bool _ b) = return $ Bool b
   interpret (ADT.None _) = pass
@@ -101,18 +106,33 @@ instance Interpretable ADT.ExprS where
         return r
       _ -> error $ show s ++ " not callable"
 
-ident2ref i = do
-  local <- access local_vars
-  global <- access global_vars
-  case M.lookup i local of
-    Just ref -> return ref
-    Nothing -> case M.lookup i global of
-      Just ref -> return ref
-      Nothing -> error $ "not found in scope"
+ident2ref i = callCC $ \k -> do
+  locals <- access local_vars
+  enclosings <- access enclosing_vars
+  toplevel <- isTopLevel
+  globals <- access global_vars
+  case M.lookup i locals of
+    Just ref -> k $ Just ref
+    Nothing -> return ()
+  case M.lookup i enclosings of
+    Just ref -> k $ Just ref
+    Nothing -> return ()
+  case M.lookup i globals of
+    Just ref -> do
+      v <- liftIO $ readIORef ref
+      case v of
+        Function{} -> k $ Just ref
+        _ -> return ()
+    Nothing -> return ()
+  return Nothing
 
 ADT.Var _ i =: x = do
   ref <- ident2ref i
-  liftIO $ writeIORef ref x
+  case ref of
+    Just ref -> liftIO $ writeIORef ref x
+    Nothing -> do
+      ref <- liftIO $ newIORef x
+      local_vars %= M.insert i ref >> return ()
 _ =: _ = error "lvalue"
 
 unaryOp ADT.Plus{} (Integer x) = Integer x

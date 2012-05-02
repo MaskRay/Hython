@@ -11,6 +11,7 @@ import Hython.Parser.Location
 import Hython.Parser.Lexer
 import Hython.Parser.Error
 import Hython.Parser.ADT
+import Hython.Parser.Utils
 }
 
 %name parseFile file
@@ -34,10 +35,12 @@ import Hython.Parser.ADT
    '=='            { EqToken {} }
    '!='            { NotEqToken {} }
    '<'             { LessToken {} }
-   '<='             { LessEqToken {} }
+   '<='            { LessEqToken {} }
    '>'             { GreaterToken {} }
-   '>='             { GreaterEqToken {} }
+   '>='            { GreaterEqToken {} }
    'and'           { AndToken {} }
+   'def'           { DefToken {} }
+   'return'        { ReturnToken {} }
    'dedent'        { DedentToken {} }
    'elif'          { ElifToken {} }
    'else'          { ElseToken {} }
@@ -50,7 +53,7 @@ import Hython.Parser.ADT
    'or'            { OrToken {} }
    'print'         { PrintToken {} }
    'while'         { WhileToken {} }
-   'continue'         { ContinueToken {} }
+   'continue'      { ContinueToken {} }
    'break'         { BreakToken {} }
 
 %%
@@ -76,6 +79,13 @@ many0(p)
 either(p,q)
   : p { Left $1 }
   | q { Right $1 }
+
+sepBy(delim,p) : sepByRev(delim,p) { reverse $1 }
+
+sepByRev(delim,p)
+  :                           { [] }
+  | p                         { [$1] }
+  | sepByRev(delim,p) delim p { $3 : $1 }
 
 opt(p)
   :   { Nothing }
@@ -130,7 +140,7 @@ comp_op
 plus_minus_op :: { OpS }
 plus_minus_op
   : '+' { Plus (getSpan $1) }
-  | '-' { Plus (getSpan $1) }
+  | '-' { Minus (getSpan $1) }
 
 expr :: { ExprS }
 expr : term many0(pair(plus_minus_op,term)) { makeBinOp $1 $2 }
@@ -147,8 +157,11 @@ term : factor many0(pair(mult_div_mod_op,factor)) { makeBinOp $1 $2 }
 factor :: { ExprS }
 factor
   : plus_minus_op factor { UnaryOp (spanning $1 $2) $1 $2 }
-  | atom { $1 }
+  | atom many0(trailer) { makeTrailer $1 $2 }
 
+trailer :: { TrailerS }
+trailer
+  : '(' sepBy(',',test) ')' { TrailerCall (spanning $1 $3) $2 }
 
 
 statement :: { [StatementS] }
@@ -162,6 +175,8 @@ compound_stmt
     { Conditional (spanning (spanning (spanning $1 $4) $5) $6) (($2,$4):$5) $6 }
   | 'while' test ':' suite opt_else
     { While (spanning (spanning $1 $4) $5) $2 $4 $5 }
+  | 'def' identifier parameters ':' suite
+    { Fun (spanning $1 $5) $2 $3 $5 }
   -- TODO: for try ...
 
 opt_else :: { [StatementS] }
@@ -192,18 +207,15 @@ small_stmt
   | 'continue' { Continue (getSpan $1) }
   | 'break' { Break (getSpan $1) }
   | 'print' test opt(',') { Print (spanning (spanning $1 $2) $3) $2 (isJust $3) }
+  | 'return' test { Return (spanning $1 $2) $2 }
 
 many_assign_stmt :: { [ExprS] }
 many_assign_stmt : many0(right('=',test)) { $1 }
 
+parameters :: { [IdentS] }
+parameters : '(' sepBy(',',identifier) ')' { $2 }
+
 {
-makeBinOp :: ExprS -> [(OpS, ExprS)] -> ExprS
-makeBinOp e es = foldl' (\e1 (op,e2) -> BinaryOp (spanning e1 e2) op e1 e2) e es
-
-makeAssignOrExpr :: ExprS -> [ExprS] -> StatementS
-makeAssignOrExpr e [] = StmtExpr (getSpan e) e
-makeAssignOrExpr e es@(_:_) = Assign (spanning e es) (e : init es) (last es)
-
 parser :: String -> Either ParseError [StatementS]
 parser code = parseCode code parseFile
 }
